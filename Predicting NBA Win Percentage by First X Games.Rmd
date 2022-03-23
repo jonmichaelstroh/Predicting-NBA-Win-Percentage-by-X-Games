@@ -1,0 +1,366 @@
+---
+title: "Predicting NBA Win Percentage by First X Games"
+author: '@jonmichaelstroh'
+date: "10/20/2021"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+Sys.setenv("VROOM_CONNECTION_SIZE" = 131072 * 2)
+library(nbastatR)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+```
+
+```{r include=FALSE}
+standings <- nbastatR::standings(seasons = 2010:2021)
+```
+
+
+### Get Overall Records
+```{r, include=FALSE}
+standings <- standings[c('slugTeam', 'slugSeason', 'pctWinTeam', 'recordOverall')]
+
+standings[3, 1] <- 'CHA'
+standings [7, 1] <- 'DEN'
+standings [18, 1] <- 'NJN'
+standings [19, 1] <- 'NOH'
+standings [33, 1] <- 'CHA'
+standings [37, 1] <- 'DEN'
+standings [48, 1] <- 'NJN'
+standings[49, 1] <- 'NOH'
+standings[63, 1] <- 'CHA'
+standings[67, 1] <- 'DEN'
+standings[78, 1] <- 'NJN'
+standings[79, 1] <- 'NOH'
+standings[94, 1] <- 'CHA'
+standings[98, 1] <- 'DEN'
+standings[109, 1] <- 'NOP'
+standings[124, 1] <- 'CHA'
+standings[128, 1] <- 'DEN'
+standings[158, 1] <- 'DEN'
+standings[188, 1] <- 'DEN'
+standings[193, 1] <- 'LAC'
+standings[218, 1] <- 'DEN'
+standings[223, 1] <- 'LAC'
+standings[248, 1] <- 'DEN'
+standings[253, 1] <- 'LAC'
+standings[278, 1] <- 'DEN'
+standings[283, 1] <- 'LAC'
+standings[308, 1] <- 'DEN'
+standings[313, 1] <- 'LAC'
+standings[338, 1] <- 'DEN'
+standings[343, 1] <- 'LAC'
+```
+
+### Edit Standings for Merging
+```{r}
+for (x in 1:nrow(standings)){
+  standings$slugTeam[x] <- paste('ss_', standings$slugTeam[x], "_", standings$slugSeason[x], sep = '')
+}
+```
+
+### Single season game records
+```{r}
+season_schedule <- nbastatR::seasons_schedule(seasons = 2010:2021, season_types = "Regular Season", box_score_tables = c("Traditional"))
+```
+```{r}
+season_schedule <- season_schedule[c('slugSeason', 'dateGame', 'slugMatchup', 'slugTeamWinner', 'slugTeamLoser')]
+```
+
+```{r , include=FALSE}
+teamList = c('ATL','BOS','BKN','CHA','CHI','CLE','DAL','DEN','DET','GSW','HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS')
+
+years = c('2009-10', '2010-11', '2011-12', '2012-13', '2013-14', '2014-15', '2015-16', '2016-17', '2017-18', '2018-19', '2019-20', '2020-21')
+
+for (x in teamList){
+  for (y in years){
+    assign(paste('ss_', x, "_", y, sep = ""),season_schedule %>% filter(slugTeamWinner == x | slugTeamLoser == x) %>% filter(slugSeason == y))
+  }
+}
+
+teamDF1 <- list(`ss_ATL_2009-10`, `ss_ATL_2010-11`, `ss_ATL_2011-12`, `ss_ATL_2012-13`, `ss_ATL_2013-14`, `ss_ATL_2014-15`, `ss_ATL_2015-16`, `ss_ATL_2016-17`, `ss_ATL_2017-18`, `ss_ATL_2018-19`, `ss_ATL_2019-20`, `ss_ATL_2020-21`,`ss_BOS_2009-10`, `ss_BOS_2010-11`, `ss_BOS_2011-12`, `ss_BOS_2012-13`, `ss_BOS_2013-14`, `ss_BOS_2014-15`, `ss_BOS_2015-16`, `ss_BOS_2016-17`, `ss_BOS_2017-18`, `ss_BOS_2018-19`, `ss_BOS_2019-20`, `ss_BOS_2020-21`, `ss_BKN_2012-13`, `ss_BKN_2013-14`, `ss_BKN_2014-15`, `ss_BKN_2015-16`, `ss_BKN_2016-17`, `ss_BKN_2017-18`, `ss_BKN_2018-19`, `ss_BKN_2019-20`, `ss_BKN_2020-21`, `ss_CHA_2009-10`, `ss_CHA_2010-11`, `ss_CHA_2011-12`, `ss_CHA_2012-13`, `ss_CHA_2013-14`, `ss_CHA_2014-15`, `ss_CHA_2015-16`, `ss_CHA_2016-17`, `ss_CHA_2017-18`, `ss_CHA_2018-19`, `ss_CHA_2019-20`, `ss_CHA_2020-21`,  `ss_CHI_2009-10`, `ss_CHI_2010-11`, `ss_CHI_2011-12`, `ss_CHI_2012-13`, `ss_CHI_2013-14`, `ss_CHI_2014-15`, `ss_CHI_2015-16`, `ss_CHI_2016-17`, `ss_CHI_2017-18`, `ss_CHI_2018-19`, `ss_CHI_2019-20`, `ss_CHI_2020-21`,  `ss_CLE_2009-10`, `ss_CLE_2010-11`, `ss_CLE_2011-12`, `ss_CLE_2012-13`, `ss_CLE_2013-14`, `ss_CLE_2014-15`, `ss_CLE_2015-16`, `ss_CLE_2016-17`, `ss_CLE_2017-18`, `ss_CLE_2018-19`, `ss_CLE_2019-20`, `ss_CLE_2020-21`,  `ss_DAL_2009-10`, `ss_DAL_2010-11`, `ss_DAL_2011-12`, `ss_DAL_2012-13`, `ss_DAL_2013-14`, `ss_DAL_2014-15`, `ss_DAL_2015-16`, `ss_DAL_2016-17`, `ss_DAL_2017-18`, `ss_DAL_2018-19`, `ss_DAL_2019-20`, `ss_DAL_2020-21`,  `ss_DEN_2009-10`, `ss_DEN_2010-11`, `ss_DEN_2011-12`, `ss_DEN_2012-13`, `ss_DEN_2013-14`, `ss_DEN_2014-15`, `ss_DEN_2015-16`, `ss_DEN_2016-17`, `ss_DEN_2017-18`, `ss_DEN_2018-19`, `ss_DEN_2019-20`, `ss_DEN_2020-21`, `ss_DET_2009-10`, `ss_DET_2010-11`, `ss_DET_2011-12`, `ss_DET_2012-13`, `ss_DET_2013-14`, `ss_DET_2014-15`, `ss_DET_2015-16`, `ss_DET_2016-17`, `ss_DET_2017-18`, `ss_DET_2018-19`, `ss_DET_2019-20`, `ss_DET_2020-21`)
+
+teamDF2 <- list(`ss_GSW_2009-10`, `ss_GSW_2010-11`, `ss_GSW_2011-12`, `ss_GSW_2012-13`, `ss_GSW_2013-14`, `ss_GSW_2014-15`, `ss_GSW_2015-16`, `ss_GSW_2016-17`, `ss_GSW_2017-18`, `ss_GSW_2018-19`, `ss_GSW_2019-20`, `ss_GSW_2020-21`,  `ss_HOU_2009-10`, `ss_HOU_2010-11`, `ss_HOU_2011-12`, `ss_HOU_2012-13`, `ss_HOU_2013-14`, `ss_HOU_2014-15`, `ss_HOU_2015-16`, `ss_HOU_2016-17`, `ss_HOU_2017-18`, `ss_HOU_2018-19`, `ss_HOU_2019-20`, `ss_HOU_2020-21`, `ss_IND_2009-10`, `ss_IND_2010-11`, `ss_IND_2011-12`, `ss_IND_2012-13`, `ss_IND_2013-14`, `ss_IND_2014-15`, `ss_IND_2015-16`, `ss_IND_2016-17`, `ss_IND_2017-18`, `ss_IND_2018-19`, `ss_IND_2019-20`, `ss_IND_2020-21`,  `ss_LAC_2009-10`, `ss_LAC_2010-11`, `ss_LAC_2011-12`, `ss_LAC_2012-13`, `ss_LAC_2013-14`, `ss_LAC_2014-15`, `ss_LAC_2015-16`, `ss_LAC_2016-17`, `ss_LAC_2017-18`, `ss_LAC_2018-19`, `ss_LAC_2019-20`, `ss_LAC_2020-21`,  `ss_LAL_2009-10`, `ss_LAL_2010-11`, `ss_LAL_2011-12`, `ss_LAL_2012-13`, `ss_LAL_2013-14`, `ss_LAL_2014-15`, `ss_LAL_2015-16`, `ss_LAL_2016-17`, `ss_LAL_2017-18`, `ss_LAL_2018-19`, `ss_LAL_2019-20`, `ss_LAL_2020-21`,  `ss_MEM_2009-10`, `ss_MEM_2010-11`, `ss_MEM_2011-12`, `ss_MEM_2012-13`, `ss_MEM_2013-14`, `ss_MEM_2014-15`, `ss_MEM_2015-16`, `ss_MEM_2016-17`, `ss_MEM_2017-18`, `ss_MEM_2018-19`, `ss_MEM_2019-20`, `ss_MEM_2020-21`,  `ss_MIA_2009-10`, `ss_MIA_2010-11`, `ss_MIA_2011-12`, `ss_MIA_2012-13`, `ss_MIA_2013-14`, `ss_MIA_2014-15`, `ss_MIA_2015-16`, `ss_MIA_2016-17`, `ss_MIA_2017-18`, `ss_MIA_2018-19`, `ss_MIA_2019-20`, `ss_MIA_2020-21`,  `ss_MIL_2009-10`, `ss_MIL_2010-11`, `ss_MIL_2011-12`, `ss_MIL_2012-13`, `ss_MIL_2013-14`, `ss_MIL_2014-15`, `ss_MIL_2015-16`, `ss_MIL_2016-17`, `ss_MIL_2017-18`, `ss_MIL_2018-19`, `ss_MIL_2019-20`, `ss_MIL_2020-21`,  `ss_MIN_2009-10`, `ss_MIN_2010-11`, `ss_MIN_2011-12`, `ss_MIN_2012-13`, `ss_MIN_2013-14`, `ss_MIN_2014-15`, `ss_MIN_2015-16`, `ss_MIN_2016-17`, `ss_MIN_2017-18`, `ss_MIN_2018-19`, `ss_MIN_2019-20`, `ss_MIN_2020-21`, `ss_NOP_2013-14`, `ss_NOP_2014-15`, `ss_NOP_2015-16`, `ss_NOP_2016-17`, `ss_NOP_2017-18`, `ss_NOP_2018-19`, `ss_NOP_2019-20`, `ss_NOP_2020-21`)
+
+teamDF3 <- list(`ss_NYK_2009-10`, `ss_NYK_2010-11`, `ss_NYK_2011-12`, `ss_NYK_2012-13`, `ss_NYK_2013-14`, `ss_NYK_2014-15`, `ss_NYK_2015-16`, `ss_NYK_2016-17`, `ss_NYK_2017-18`, `ss_NYK_2018-19`, `ss_NYK_2019-20`, `ss_NYK_2020-21`,  `ss_OKC_2009-10`, `ss_OKC_2010-11`, `ss_OKC_2011-12`, `ss_OKC_2012-13`, `ss_OKC_2013-14`, `ss_OKC_2014-15`, `ss_OKC_2015-16`, `ss_OKC_2016-17`, `ss_OKC_2017-18`, `ss_OKC_2018-19`, `ss_OKC_2019-20`, `ss_OKC_2020-21`, `ss_ORL_2009-10`, `ss_ORL_2010-11`, `ss_ORL_2011-12`, `ss_ORL_2012-13`, `ss_ORL_2013-14`, `ss_ORL_2014-15`, `ss_ORL_2015-16`, `ss_ORL_2016-17`, `ss_ORL_2017-18`, `ss_ORL_2018-19`, `ss_ORL_2019-20`, `ss_ORL_2020-21`,  `ss_PHI_2009-10`, `ss_PHI_2010-11`, `ss_PHI_2011-12`, `ss_PHI_2012-13`, `ss_PHI_2013-14`, `ss_PHI_2014-15`, `ss_PHI_2015-16`, `ss_PHI_2016-17`, `ss_PHI_2017-18`, `ss_PHI_2018-19`, `ss_PHI_2019-20`, `ss_PHI_2020-21`,  `ss_PHX_2009-10`, `ss_PHX_2010-11`, `ss_PHX_2011-12`, `ss_PHX_2012-13`, `ss_PHX_2013-14`, `ss_PHX_2014-15`, `ss_PHX_2015-16`, `ss_PHX_2016-17`, `ss_PHX_2017-18`, `ss_PHX_2018-19`, `ss_PHX_2019-20`, `ss_PHX_2020-21`,  `ss_POR_2009-10`, `ss_POR_2010-11`, `ss_POR_2011-12`, `ss_POR_2012-13`, `ss_POR_2013-14`, `ss_POR_2014-15`, `ss_POR_2015-16`, `ss_POR_2016-17`, `ss_POR_2017-18`, `ss_POR_2018-19`, `ss_POR_2019-20`, `ss_POR_2020-21`,  `ss_SAC_2009-10`, `ss_SAC_2010-11`, `ss_SAC_2011-12`, `ss_SAC_2012-13`, `ss_SAC_2013-14`, `ss_SAC_2014-15`, `ss_SAC_2015-16`, `ss_SAC_2016-17`, `ss_SAC_2017-18`, `ss_SAC_2018-19`, `ss_SAC_2019-20`, `ss_SAC_2020-21`,  `ss_SAS_2009-10`, `ss_SAS_2010-11`, `ss_SAS_2011-12`, `ss_SAS_2012-13`, `ss_SAS_2013-14`, `ss_SAS_2014-15`, `ss_SAS_2015-16`, `ss_SAS_2016-17`, `ss_SAS_2017-18`, `ss_SAS_2018-19`, `ss_SAS_2019-20`, `ss_SAS_2020-21`,  `ss_TOR_2009-10`, `ss_TOR_2010-11`, `ss_TOR_2011-12`, `ss_TOR_2012-13`, `ss_TOR_2013-14`, `ss_TOR_2014-15`, `ss_TOR_2015-16`, `ss_TOR_2016-17`, `ss_TOR_2017-18`, `ss_TOR_2018-19`, `ss_TOR_2019-20`, `ss_TOR_2020-21`,  `ss_UTA_2009-10`, `ss_UTA_2010-11`, `ss_UTA_2011-12`, `ss_UTA_2012-13`, `ss_UTA_2013-14`, `ss_UTA_2014-15`, `ss_UTA_2015-16`, `ss_UTA_2016-17`, `ss_UTA_2017-18`, `ss_UTA_2018-19`, `ss_UTA_2019-20`, `ss_UTA_2020-21`,  `ss_WAS_2009-10`, `ss_WAS_2010-11`, `ss_WAS_2011-12`, `ss_WAS_2012-13`, `ss_WAS_2013-14`, `ss_WAS_2014-15`, `ss_WAS_2015-16`, `ss_WAS_2016-17`, `ss_WAS_2017-18`, `ss_WAS_2018-19`, `ss_WAS_2019-20`, `ss_WAS_2020-21`)
+
+names(teamDF1) <- c("ss_ATL_2009-10", "ss_ATL_2010-11", "ss_ATL_2011-12", "ss_ATL_2012-13", "ss_ATL_2013-14", "ss_ATL_2014-15", "ss_ATL_2015-16", "ss_ATL_2016-17", "ss_ATL_2017-18", "ss_ATL_2018-19", "ss_ATL_2019-20", "ss_ATL_2020-21","ss_BOS_2009-10", "ss_BOS_2010-11", "ss_BOS_2011-12", "ss_BOS_2012-13", "ss_BOS_2013-14", "ss_BOS_2014-15", "ss_BOS_2015-16", "ss_BOS_2016-17", "ss_BOS_2017-18", "ss_BOS_2018-19", "ss_BOS_2019-20", "ss_BOS_2020-21", "ss_BKN_2012-13", "ss_BKN_2013-14", "ss_BKN_2014-15", "ss_BKN_2015-16", "ss_BKN_2016-17", "ss_BKN_2017-18", "ss_BKN_2018-19", "ss_BKN_2019-20", "ss_BKN_2020-21", "ss_CHA_2009-10", "ss_CHA_2010-11", "ss_CHA_2011-12", "ss_CHA_2012-13", "ss_CHA_2013-14", "ss_CHA_2014-15", "ss_CHA_2015-16", "ss_CHA_2016-17", "ss_CHA_2017-18", "ss_CHA_2018-19", "ss_CHA_2019-20", "ss_CHA_2020-21",  "ss_CHI_2009-10", "ss_CHI_2010-11", "ss_CHI_2011-12", "ss_CHI_2012-13", "ss_CHI_2013-14", "ss_CHI_2014-15", "ss_CHI_2015-16", "ss_CHI_2016-17", "ss_CHI_2017-18", "ss_CHI_2018-19", "ss_CHI_2019-20", "ss_CHI_2020-21",  "ss_CLE_2009-10", "ss_CLE_2010-11", "ss_CLE_2011-12", "ss_CLE_2012-13", "ss_CLE_2013-14", "ss_CLE_2014-15", "ss_CLE_2015-16", "ss_CLE_2016-17", "ss_CLE_2017-18", "ss_CLE_2018-19", "ss_CLE_2019-20", "ss_CLE_2020-21",  "ss_DAL_2009-10", "ss_DAL_2010-11", "ss_DAL_2011-12", "ss_DAL_2012-13", "ss_DAL_2013-14", "ss_DAL_2014-15", "ss_DAL_2015-16", "ss_DAL_2016-17", "ss_DAL_2017-18", "ss_DAL_2018-19", "ss_DAL_2019-20", "ss_DAL_2020-21",  "ss_DEN_2009-10", "ss_DEN_2010-11", "ss_DEN_2011-12", "ss_DEN_2012-13", "ss_DEN_2013-14", "ss_DEN_2014-15", "ss_DEN_2015-16", "ss_DEN_2016-17", "ss_DEN_2017-18", "ss_DEN_2018-19", "ss_DEN_2019-20", "ss_DEN_2020-21", "ss_DET_2009-10", "ss_DET_2010-11", "ss_DET_2011-12", "ss_DET_2012-13", "ss_DET_2013-14", "ss_DET_2014-15", "ss_DET_2015-16", "ss_DET_2016-17", "ss_DET_2017-18", "ss_DET_2018-19", "ss_DET_2019-20", "ss_DET_2020-21")
+
+names(teamDF2) <- c("ss_GSW_2009-10", "ss_GSW_2010-11", "ss_GSW_2011-12", "ss_GSW_2012-13", "ss_GSW_2013-14", "ss_GSW_2014-15", "ss_GSW_2015-16", "ss_GSW_2016-17", "ss_GSW_2017-18", "ss_GSW_2018-19", "ss_GSW_2019-20", "ss_GSW_2020-21",  "ss_HOU_2009-10", "ss_HOU_2010-11", "ss_HOU_2011-12", "ss_HOU_2012-13", "ss_HOU_2013-14", "ss_HOU_2014-15", "ss_HOU_2015-16", "ss_HOU_2016-17", "ss_HOU_2017-18", "ss_HOU_2018-19", "ss_HOU_2019-20", "ss_HOU_2020-21", "ss_IND_2009-10", "ss_IND_2010-11", "ss_IND_2011-12", "ss_IND_2012-13", "ss_IND_2013-14", "ss_IND_2014-15", "ss_IND_2015-16", "ss_IND_2016-17", "ss_IND_2017-18", "ss_IND_2018-19", "ss_IND_2019-20", "ss_IND_2020-21",  "ss_LAC_2009-10", "ss_LAC_2010-11", "ss_LAC_2011-12", "ss_LAC_2012-13", "ss_LAC_2013-14", "ss_LAC_2014-15", "ss_LAC_2015-16", "ss_LAC_2016-17", "ss_LAC_2017-18", "ss_LAC_2018-19", "ss_LAC_2019-20", "ss_LAC_2020-21",  "ss_LAL_2009-10", "ss_LAL_2010-11", "ss_LAL_2011-12", "ss_LAL_2012-13", "ss_LAL_2013-14", "ss_LAL_2014-15", "ss_LAL_2015-16", "ss_LAL_2016-17", "ss_LAL_2017-18", "ss_LAL_2018-19", "ss_LAL_2019-20", "ss_LAL_2020-21",  "ss_MEM_2009-10", "ss_MEM_2010-11", "ss_MEM_2011-12", "ss_MEM_2012-13", "ss_MEM_2013-14", "ss_MEM_2014-15", "ss_MEM_2015-16", "ss_MEM_2016-17", "ss_MEM_2017-18", "ss_MEM_2018-19", "ss_MEM_2019-20", "ss_MEM_2020-21",  "ss_MIA_2009-10", "ss_MIA_2010-11", "ss_MIA_2011-12", "ss_MIA_2012-13", "ss_MIA_2013-14", "ss_MIA_2014-15", "ss_MIA_2015-16", "ss_MIA_2016-17", "ss_MIA_2017-18", "ss_MIA_2018-19", "ss_MIA_2019-20", "ss_MIA_2020-21",  "ss_MIL_2009-10", "ss_MIL_2010-11", "ss_MIL_2011-12", "ss_MIL_2012-13", "ss_MIL_2013-14", "ss_MIL_2014-15", "ss_MIL_2015-16", "ss_MIL_2016-17", "ss_MIL_2017-18", "ss_MIL_2018-19", "ss_MIL_2019-20", "ss_MIL_2020-21",  "ss_MIN_2009-10", "ss_MIN_2010-11", "ss_MIN_2011-12", "ss_MIN_2012-13", "ss_MIN_2013-14", "ss_MIN_2014-15", "ss_MIN_2015-16", "ss_MIN_2016-17", "ss_MIN_2017-18", "ss_MIN_2018-19", "ss_MIN_2019-20", "ss_MIN_2020-21", "ss_NOP_2013-14", "ss_NOP_2014-15", "ss_NOP_2015-16", "ss_NOP_2016-17", "ss_NOP_2017-18", "ss_NOP_2018-19", "ss_NOP_2019-20", "ss_NOP_2020-21")
+
+names(teamDF3) <- c( "ss_NYK_2009-10", "ss_NYK_2010-11", "ss_NYK_2011-12", "ss_NYK_2012-13", "ss_NYK_2013-14", "ss_NYK_2014-15", "ss_NYK_2015-16", "ss_NYK_2016-17", "ss_NYK_2017-18", "ss_NYK_2018-19", "ss_NYK_2019-20", "ss_NYK_2020-21",  "ss_OKC_2009-10", "ss_OKC_2010-11", "ss_OKC_2011-12", "ss_OKC_2012-13", "ss_OKC_2013-14", "ss_OKC_2014-15", "ss_OKC_2015-16", "ss_OKC_2016-17", "ss_OKC_2017-18", "ss_OKC_2018-19", "ss_OKC_2019-20", "ss_OKC_2020-21", "ss_ORL_2009-10", "ss_ORL_2010-11", "ss_ORL_2011-12", "ss_ORL_2012-13", "ss_ORL_2013-14", "ss_ORL_2014-15", "ss_ORL_2015-16", "ss_ORL_2016-17", "ss_ORL_2017-18", "ss_ORL_2018-19", "ss_ORL_2019-20", "ss_ORL_2020-21",  "ss_PHI_2009-10", "ss_PHI_2010-11", "ss_PHI_2011-12", "ss_PHI_2012-13", "ss_PHI_2013-14", "ss_PHI_2014-15", "ss_PHI_2015-16", "ss_PHI_2016-17", "ss_PHI_2017-18", "ss_PHI_2018-19", "ss_PHI_2019-20", "ss_PHI_2020-21",  "ss_PHX_2009-10", "ss_PHX_2010-11", "ss_PHX_2011-12", "ss_PHX_2012-13", "ss_PHX_2013-14", "ss_PHX_2014-15", "ss_PHX_2015-16", "ss_PHX_2016-17", "ss_PHX_2017-18", "ss_PHX_2018-19", "ss_PHX_2019-20", "ss_PHX_2020-21",  "ss_POR_2009-10", "ss_POR_2010-11", "ss_POR_2011-12", "ss_POR_2012-13", "ss_POR_2013-14", "ss_POR_2014-15", "ss_POR_2015-16", "ss_POR_2016-17", "ss_POR_2017-18", "ss_POR_2018-19", "ss_POR_2019-20", "ss_POR_2020-21",  "ss_SAC_2009-10", "ss_SAC_2010-11", "ss_SAC_2011-12", "ss_SAC_2012-13", "ss_SAC_2013-14", "ss_SAC_2014-15", "ss_SAC_2015-16", "ss_SAC_2016-17", "ss_SAC_2017-18", "ss_SAC_2018-19", "ss_SAC_2019-20", "ss_SAC_2020-21",  "ss_SAS_2009-10", "ss_SAS_2010-11", "ss_SAS_2011-12", "ss_SAS_2012-13", "ss_SAS_2013-14", "ss_SAS_2014-15", "ss_SAS_2015-16", "ss_SAS_2016-17", "ss_SAS_2017-18", "ss_SAS_2018-19", "ss_SAS_2019-20", "ss_SAS_2020-21",  "ss_TOR_2009-10", "ss_TOR_2010-11", "ss_TOR_2011-12", "ss_TOR_2012-13", "ss_TOR_2013-14", "ss_TOR_2014-15", "ss_TOR_2015-16", "ss_TOR_2016-17", "ss_TOR_2017-18", "ss_TOR_2018-19", "ss_TOR_2019-20", "ss_TOR_2020-21",  "ss_UTA_2009-10", "ss_UTA_2010-11", "ss_UTA_2011-12", "ss_UTA_2012-13", "ss_UTA_2013-14", "ss_UTA_2014-15", "ss_UTA_2015-16", "ss_UTA_2016-17", "ss_UTA_2017-18", "ss_UTA_2018-19", "ss_UTA_2019-20", "ss_UTA_2020-21",  "ss_WAS_2009-10", "ss_WAS_2010-11", "ss_WAS_2011-12", "ss_WAS_2012-13", "ss_WAS_2013-14", "ss_WAS_2014-15", "ss_WAS_2015-16", "ss_WAS_2016-17", "ss_WAS_2017-18", "ss_WAS_2018-19", "ss_WAS_2019-20", "ss_WAS_2020-21")
+
+count <- 1
+teamList2 = c('ATL', 'ATL', 'ATL', 'ATL', 'ATL', 'ATL', 'ATL', 'ATL', 'ATL', 'ATL', 'ATL', 'ATL','BOS', 'BOS', 'BOS', 'BOS', 'BOS', 'BOS', 'BOS', 'BOS', 'BOS', 'BOS', 'BOS','BOS','BKN', 'BKN', 'BKN', 'BKN', 'BKN', 'BKN', 'BKN', 'BKN', 'BKN','CHA', 'CHA', 'CHA', 'CHA', 'CHA', 'CHA', 'CHA', 'CHA', 'CHA', 'CHA', 'CHA', 'CHA','CHI', 'CHI', 'CHI', 'CHI', 'CHI', 'CHI', 'CHI', 'CHI', 'CHI', 'CHI', 'CHI', 'CHI','CLE', 'CLE', 'CLE', 'CLE', 'CLE', 'CLE', 'CLE', 'CLE', 'CLE', 'CLE', 'CLE', 'CLE','DAL', 'DAL', 'DAL', 'DAL', 'DAL', 'DAL', 'DAL', 'DAL', 'DAL', 'DAL', 'DAL', 'DAL','DEN', 'DEN', 'DEN', 'DEN', 'DEN', 'DEN', 'DEN', 'DEN', 'DEN', 'DEN', 'DEN', 'DEN','DET', 'DET', 'DET', 'DET', 'DET', 'DET', 'DET', 'DET', 'DET', 'DET', 'DET', 'DET')
+for (df_name in names(teamDF1)) {
+    teamDF1[[df_name]] <- mutate(teamDF1[[df_name]],
+            ngame = 1:nrow(teamDF1[[df_name]]),
+           wins = ifelse(slugTeamWinner == teamList2[count], 1, 0),
+           runningWins = cumsum(wins))
+    count <- count + 1
+}
+
+count2 <- 1
+teamList3 = c('GSW', 'GSW', 'GSW', 'GSW', 'GSW', 'GSW', 'GSW', 'GSW', 'GSW', 'GSW', 'GSW', 'GSW','HOU', 'HOU', 'HOU', 'HOU', 'HOU', 'HOU', 'HOU', 'HOU', 'HOU', 'HOU', 'HOU', 'HOU', 'IND', 'IND', 'IND', 'IND', 'IND', 'IND', 'IND', 'IND', 'IND', 'IND', 'IND', 'IND', 'LAC', 'LAC', 'LAC', 'LAC', 'LAC', 'LAC', 'LAC', 'LAC', 'LAC', 'LAC', 'LAC', 'LAC', 'LAL', 'LAL', 'LAL', 'LAL', 'LAL', 'LAL', 'LAL', 'LAL', 'LAL', 'LAL', 'LAL', 'LAL', 'MEM', 'MEM', 'MEM', 'MEM', 'MEM', 'MEM', 'MEM', 'MEM', 'MEM', 'MEM', 'MEM', 'MEM', 'MIA', 'MIA', 'MIA', 'MIA', 'MIA', 'MIA', 'MIA', 'MIA', 'MIA', 'MIA', 'MIA', 'MIA', 'MIL', 'MIL', 'MIL', 'MIL', 'MIL', 'MIL', 'MIL', 'MIL', 'MIL', 'MIL', 'MIL', 'MIL', 'MIN', 'MIN', 'MIN', 'MIN', 'MIN', 'MIN', 'MIN', 'MIN', 'MIN', 'MIN', 'MIN', 'MIN','NOP', 'NOP', 'NOP', 'NOP', 'NOP', 'NOP', 'NOP', 'NOP')
+for (df_name in names(teamDF2)) {
+    teamDF2[[df_name]] <- mutate(teamDF2[[df_name]],
+            ngame = 1:nrow(teamDF2[[df_name]]),
+           wins = ifelse(slugTeamWinner == teamList3[count2], 1, 0),
+           runningWins = cumsum(wins))
+    count2 <- count2 + 1
+}
+
+count3 <- 1
+teamList4 = c('NYK', 'NYK', 'NYK', 'NYK', 'NYK', 'NYK', 'NYK', 'NYK', 'NYK', 'NYK', 'NYK', 'NYK','OKC', 'OKC', 'OKC', 'OKC', 'OKC', 'OKC', 'OKC', 'OKC', 'OKC', 'OKC', 'OKC','OKC','ORL', 'ORL', 'ORL', 'ORL', 'ORL', 'ORL', 'ORL', 'ORL', 'ORL', 'ORL', 'ORL', 'ORL','PHI', 'PHI', 'PHI', 'PHI', 'PHI', 'PHI', 'PHI', 'PHI', 'PHI', 'PHI', 'PHI', 'PHI','PHX', 'PHX', 'PHX', 'PHX', 'PHX', 'PHX', 'PHX', 'PHX', 'PHX', 'PHX', 'PHX', 'PHX','POR', 'POR', 'POR', 'POR', 'POR', 'POR', 'POR', 'POR', 'POR', 'POR', 'POR', 'POR','SAC', 'SAC', 'SAC', 'SAC', 'SAC', 'SAC', 'SAC', 'SAC', 'SAC', 'SAC', 'SAC', 'SAC','SAS', 'SAS', 'SAS', 'SAS', 'SAS', 'SAS', 'SAS', 'SAS', 'SAS', 'SAS', 'SAS', 'SAS','TOR', 'TOR', 'TOR', 'TOR', 'TOR', 'TOR', 'TOR', 'TOR', 'TOR', 'TOR', 'TOR', 'TOR', 'UTA', 'UTA', 'UTA', 'UTA', 'UTA', 'UTA', 'UTA', 'UTA', 'UTA', 'UTA', 'UTA', 'UTA', 'WAS', 'WAS', 'WAS', 'WAS', 'WAS', 'WAS', 'WAS', 'WAS', 'WAS', 'WAS', 'WAS', 'WAS')
+
+for (df_name in names(teamDF3)) {
+    teamDF3[[df_name]] <- mutate(teamDF3[[df_name]],
+            ngame = 1:nrow(teamDF3[[df_name]]),
+           wins = ifelse(slugTeamWinner == teamList4[count3], 1, 0),
+           runningWins = cumsum(wins))
+    count3 <- count3 + 1
+}
+```
+
+So we have the ability to, from 2010 to 2021, judge how strong of a predictor the first N number of NBA games is on the rest of a team's season:
+
+### N game records
+
+## N = 1
+
+How about we start with 1 game:
+
+```{r}
+years <- c()
+teams <- c()
+ngameperc <- c()
+n <- 1
+for (df_name in names(teamDF1)){
+  years <- append(years, teamDF1[[df_name]]$slugSeason[1])
+  teams <- append(teams, df_name)
+  ngameperc <- append(ngameperc, teamDF1[[df_name]]$runningWins[n]/n)
+}
+
+ngamepercdf <- data.frame(years, teams, ngameperc)
+```
+
+### dataframe 2
+```{r}
+years <- c()
+teams <- c()
+ngameperc <- c()
+for (df_name in names(teamDF2)){
+  years <- append(years, teamDF2[[df_name]]$slugSeason[1])
+  teams <- append(teams, df_name)
+  ngameperc <- append(ngameperc, teamDF2[[df_name]]$runningWins[n]/n)
+}
+
+ngamepercdf2 <- data.frame(years, teams, ngameperc)
+```
+
+### dataframe 3
+```{r}
+years <- c()
+teams <- c()
+ngameperc <- c()
+for (df_name in names(teamDF3)){
+  years <- append(years, teamDF3[[df_name]]$slugSeason[1])
+  teams <- append(teams, df_name)
+  ngameperc <- append(ngameperc, teamDF3[[df_name]]$runningWins[n]/n)
+}
+
+ngamepercdf3 <- data.frame(years, teams, ngameperc)
+```
+
+# merge both dfs
+```{r}
+ngamepercdf  <- rbind(ngamepercdf, ngamepercdf2)
+ngamepercdf <- rbind(ngamepercdf, ngamepercdf3)
+```
+
+```{r}
+combinedDF <- merge(standings, ngamepercdf, by.x="slugTeam", by.y="teams")
+```
+
+#Get percent after n games
+```{r}
+combinedDF <- within(combinedDF, recordOverall<-data.frame(do.call('rbind', strsplit(as.character(recordOverall), '-', fixed=TRUE))))
+```
+
+```{r}
+combinedDF <- combinedDF %>% mutate(percentAfter = (strtoi(recordOverall$X1) - (n * ngameperc))/((strtoi(recordOverall$X1) - (n * ngameperc))+(strtoi(recordOverall$X2) - (n - (n * ngameperc)))))
+```
+
+```{r 1 graph}
+combinedDF <- combinedDF %>% mutate(win = if_else(ngameperc == 1, 'Win', 'Loss'))
+
+ggplot(combinedDF, aes(x = win, y = percentAfter)) + geom_jitter(alpha=0.5, color = '#C84E00',position = position_jitter(width = .2)) + labs(x = 'Game 1 Win or Loss', y = 'Win percentage over remainder of season', title = "It's ok to lose your first game! ", caption = "Creator: @jonmichaelstroh | Data: nbastatr") + theme(plot.background = element_rect(fill = '#FCF7E5'), plot.title = element_text(face = "bold", hjust = 0.5, size = 40/.pt, color = '#C84E00'), panel.background = element_rect(fill = "#BFD5E3", colour = "white",
+size = 2, linetype = "solid"), panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "white"), panel.grid.minor = element_line(size = 0.25, linetype = 'solid',colour = "white"), axis.title.x = element_text(color = '#C84E00'), axis.title.y = element_text(color = '#C84E00'))
+```
+
+## N = 5
+
+What about after 5 games?
+
+```{r , include=FALSE}
+years <- c()
+teams <- c()
+ngameperc <- c()
+n <- 5
+for (df_name in names(teamDF1)){
+  years <- append(years, teamDF1[[df_name]]$slugSeason[1])
+  teams <- append(teams, df_name)
+  ngameperc <- append(ngameperc, teamDF1[[df_name]]$runningWins[n]/n)
+}
+
+ngamepercdf <- data.frame(years, teams, ngameperc)
+```
+
+### dataframe 2
+```{r, include=FALSE}
+years <- c()
+teams <- c()
+ngameperc <- c()
+for (df_name in names(teamDF2)){
+  years <- append(years, teamDF2[[df_name]]$slugSeason[1])
+  teams <- append(teams, df_name)
+  ngameperc <- append(ngameperc, teamDF2[[df_name]]$runningWins[n]/n)
+}
+
+ngamepercdf2 <- data.frame(years, teams, ngameperc)
+```
+
+### dataframe 3
+```{r, include=FALSE}
+years <- c()
+teams <- c()
+ngameperc <- c()
+for (df_name in names(teamDF3)){
+  years <- append(years, teamDF3[[df_name]]$slugSeason[1])
+  teams <- append(teams, df_name)
+  ngameperc <- append(ngameperc, teamDF3[[df_name]]$runningWins[n]/n)
+}
+
+ngamepercdf3 <- data.frame(years, teams, ngameperc)
+```
+
+# merge both dfs
+```{r, include=FALSE}
+ngamepercdf  <- rbind(ngamepercdf, ngamepercdf2)
+ngamepercdf <- rbind(ngamepercdf, ngamepercdf3)
+```
+
+```{r, include=FALSE}
+combinedDF <- merge(standings, ngamepercdf, by.x="slugTeam", by.y="teams")
+```
+
+#Get percent after n games
+```{r, include=FALSE}
+combinedDF <- within(combinedDF, recordOverall<-data.frame(do.call('rbind', strsplit(as.character(recordOverall), '-', fixed=TRUE))))
+```
+
+```{r, include=FALSE}
+combinedDF <- combinedDF %>% mutate(percentAfter = (strtoi(recordOverall$X1) - (n * ngameperc))/((strtoi(recordOverall$X1) - (n * ngameperc))+(strtoi(recordOverall$X2) - (n - (n * ngameperc)))))
+```
+
+```{r 5 graph}
+ggplot(combinedDF, aes(x = as.factor(round(ngameperc, 2)), y = percentAfter)) + geom_boxplot(fill = '#C84E00', alpha = 0.7) + labs(x = 'Win percentage by Game 5', y = 'Win percentage over remainder of season', title = "Great teams start 5 and 0; Some bad one have gone 4 and 1", caption = "Creator: @jonmichaelstroh | Data: nbastatr") + theme(plot.background = element_rect(fill = '#FCF7E5'), plot.title = element_text(face = "bold", hjust = 0.5, size = 30/.pt, color = '#C84E00'), panel.background = element_rect(fill = "#BFD5E3", colour = "white",
+size = 2, linetype = "solid"), panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "white"), panel.grid.minor = element_line(size = 0.25, linetype = 'solid',colour = "white"), axis.title.x = element_text(color = '#C84E00'), axis.title.y = element_text(color = '#C84E00'))
+```
+
+## N = 15
+
+And finally, 15 games...
+
+```{r}
+years <- c()
+teams <- c()
+ngameperc <- c()
+n <- 15
+for (df_name in names(teamDF1)){
+  years <- append(years, teamDF1[[df_name]]$slugSeason[1])
+  teams <- append(teams, df_name)
+  ngameperc <- append(ngameperc, teamDF1[[df_name]]$runningWins[n]/n)
+}
+
+ngamepercdf <- data.frame(years, teams, ngameperc)
+```
+
+### dataframe 2
+```{r}
+years <- c()
+teams <- c()
+ngameperc <- c()
+for (df_name in names(teamDF2)){
+  years <- append(years, teamDF2[[df_name]]$slugSeason[1])
+  teams <- append(teams, df_name)
+  ngameperc <- append(ngameperc, teamDF2[[df_name]]$runningWins[n]/n)
+}
+
+ngamepercdf2 <- data.frame(years, teams, ngameperc)
+```
+
+### dataframe 3
+```{r}
+years <- c()
+teams <- c()
+ngameperc <- c()
+for (df_name in names(teamDF3)){
+  years <- append(years, teamDF3[[df_name]]$slugSeason[1])
+  teams <- append(teams, df_name)
+  ngameperc <- append(ngameperc, teamDF3[[df_name]]$runningWins[n]/n)
+}
+
+ngamepercdf3 <- data.frame(years, teams, ngameperc)
+```
+
+# merge both dfs
+```{r}
+ngamepercdf  <- rbind(ngamepercdf, ngamepercdf2)
+ngamepercdf <- rbind(ngamepercdf, ngamepercdf3)
+```
+
+```{r}
+combinedDF <- merge(standings, ngamepercdf, by.x="slugTeam", by.y="teams")
+```
+
+#Get percent after n games
+```{r}
+combinedDF <- within(combinedDF, recordOverall<-data.frame(do.call('rbind', strsplit(as.character(recordOverall), '-', fixed=TRUE))))
+```
+
+```{r}
+combinedDF <- combinedDF %>% mutate(percentAfter = (strtoi(recordOverall$X1) - (n * ngameperc))/((strtoi(recordOverall$X1) - (n * ngameperc))+(strtoi(recordOverall$X2) - (n - (n * ngameperc)))))
+```
+
+```{r 15 graph}
+ggplot(combinedDF, aes(x = as.factor(round(ngameperc, 2)), y = percentAfter)) + geom_boxplot(fill = '#C84E00', alpha = 0.7) + labs(x = 'Win percentage by Game 15!', y = 'Win percentage over remainder of season', title = "Things seem pretty set by Game 15", caption = "Creator: @jonmichaelstroh | Data: nbastatr") + theme(plot.background = element_rect(fill = '#FCF7E5'), plot.title = element_text(face = "bold", hjust = 0.5, size = 40/.pt, color = '#C84E00'), panel.background = element_rect(fill = "#BFD5E3", colour = "white",
+size = 2, linetype = "solid"), panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "white"), panel.grid.minor = element_line(size = 0.25, linetype = 'solid',colour = "white"), axis.title.x = element_text(color = '#C84E00'), axis.title.y = element_text(color = '#C84E00'))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
